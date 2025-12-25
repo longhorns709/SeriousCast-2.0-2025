@@ -122,12 +122,13 @@ $(function() {
     }
 
     function update_art(url) {
-        if (url && url.length) {
-            $('.art').css('background-image', "url('" + url + "')");
-            $('link[rel="shortcut icon"]').attr('href', url);
-        } else {
-            $('.art').css('background-image', "url('" + default_art + "')");
-        }
+        var artUrl = (url && url.length) ? url : default_art;
+        // Update blurred background
+        $('.art').css('background-image', "url('" + artUrl + "')");
+        // Update visible album thumbnail
+        $('#album-art-img').attr('src', artUrl);
+        // Update favicon
+        $('link[rel="shortcut icon"]').attr('href', artUrl);
         // Hide buy link by default; backend does not provide it
         $('#buylink').hide();
     }
@@ -268,14 +269,43 @@ $(function() {
         favorites.forEach(function(ch) {
             $.getJSON('/metadata/' + ch + '/0', function(data) {
                 var np = data['nowplaying'] || {};
-                var artist = np['artist'] || 'Unknown';
-                var title = np['title'] || 'Unknown';
+                var artist = np['artist'] || '';
+                var title = np['title'] || '';
+                var artwork = np['artwork'] || '';
                 var channel = data['channel'] || {};
-                var genre = channel['genre'] || 'Unknown';
+                var genre = channel['genre'] || '';
                 var row = $('#favchannels tr[data-channel="' + ch + '"]');
-                // Update genre and description for favorites only
-                row.find('.genre').text(genre);
-                row.find('.desc').text(artist + ' - ' + title);
+                // Update genre for favorites
+                if (genre) row.find('.genre').text(genre);
+                
+                // Add or update now-playing info under the channel name
+                var nameCell = row.find('.name');
+                var nowPlayingText = '';
+                if (artist && title) {
+                    nowPlayingText = artist + ' - ' + title;
+                } else if (artist) {
+                    nowPlayingText = artist;
+                } else if (title) {
+                    nowPlayingText = title;
+                }
+                
+                // Check if now-playing span exists, if not create it
+                var npSpan = nameCell.find('.fav-now-playing');
+                if (npSpan.length === 0) {
+                    nameCell.append('<span class="fav-now-playing"></span>');
+                    npSpan = nameCell.find('.fav-now-playing');
+                }
+                npSpan.text(nowPlayingText);
+                
+                // Update the mini artwork on the favorite card
+                if (artwork) {
+                    var artImg = row.find('.channel-art');
+                    // Store original channel art as fallback
+                    if (!artImg.data('original-src')) {
+                        artImg.data('original-src', artImg.attr('src'));
+                    }
+                    artImg.attr('src', artwork);
+                }
             });
         });
     }
@@ -297,6 +327,7 @@ $(function() {
         link.show();
     }
 
+    // Update current playing channel metadata every 2 seconds
     setInterval(function() {
         try {
             if (current_channel !== undefined && !metadata_request) {
@@ -315,4 +346,9 @@ $(function() {
         } catch (ex) {
         }
     }, 2000);
+
+    // Update favorites now-playing info every 15 seconds
+    setInterval(function() {
+        refreshFavoritesNowPlaying();
+    }, 15000);
 });
