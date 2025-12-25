@@ -38,6 +38,9 @@ class Sirius():
         self.channels = None
         self.lineup = {}
 
+        # Pre-build the SiriusXM image server base URL template
+        self.image_server = 'https://imgsrv-sxm-prod-device.streaming.siriusxm.com/'
+
 
     def _log(self, message):
         logging.info('<SiriusXM>: {}'.format(message))
@@ -249,15 +252,79 @@ class Sirius():
             try:
                 channel_num = int(channel.get('siriusChannelNumber', 0))
                 if channel_num > 0:
+                    # Attempt to capture a channel logo/art URL from images list
+                    art_url = None
+                    try:
+                        images_data = channel.get('images', {})
+                        images_list = images_data.get('images', [])
+                        # Prefer 'color channel logo (on dark)' or 'list view channel logo'
+                        for img in images_list:
+                            name = img.get('name', '').lower()
+                            if 'color channel logo' in name or 'list view channel logo' in name:
+                                art_url = img.get('url')
+                                break
+                        # Fallback to any logo
+                        if not art_url:
+                            for img in images_list:
+                                name = img.get('name', '').lower()
+                                if 'logo' in name:
+                                    art_url = img.get('url')
+                                    break
+                        # Fallback to any image
+                        if not art_url and images_list:
+                            art_url = images_list[0].get('url')
+                    except Exception:
+                        art_url = None
+
                     self.lineup[channel_num] = {
                         'siriusChannelNo': channel_num,
                         'channelKey': channel.get('channelId', ''),
                         'channelGuid': channel.get('channelGuid', ''),
                         'name': channel.get('name', ''),
                         'genre': channel.get('genre', {}).get('name', '') if isinstance(channel.get('genre'), dict) else channel.get('genre', 'Unknown'),
+                        'artUrl': art_url,
                     }
             except (ValueError, TypeError):
                 continue
+
+
+    def _build_art_url(self, key, size=600):
+        """Build the SiriusXM artwork URL given an image key."""
+        if not key:
+            return None
+
+        edits = {
+            "key": key,
+            "edits": [
+                {"format": {"type": "jpeg"}},
+                {"resize": {"width": size, "height": size}},
+            ],
+        }
+        encoded = base64.b64encode(json.dumps(edits).encode('utf-8')).decode('ascii')
+        return f"{self.image_server}{encoded}"
+
+
+    def get_channel_art(self, channel_key, size=600):
+        """Return the channel artwork URL if available."""
+        guid, channel_id = self._get_channel(channel_key)
+        # Accept channel_key as channelId or number lookup fallback
+        art_url = None
+        if guid or channel_id:
+            # Try lookup by channel id
+            for _, ch in self.lineup.items():
+                if ch.get('channelKey') == channel_id:
+                    art_url = ch.get('artUrl')
+                    break
+
+        # If still empty and channel_key is numeric (lineup is keyed by number)
+        if art_url is None:
+            try:
+                num = int(channel_key)
+                art_url = self.lineup.get(num, {}).get('artUrl')
+            except (TypeError, ValueError):
+                pass
+
+        return art_url
 
 
     def _get_channel(self, name):
@@ -515,19 +582,65 @@ class Sirius():
         except (KeyError, IndexError, TypeError):
             return None
 
-        current_event = lcd.get('currentEvent') or (lcd.get('liveChannelEvents') or [{}])[0]
-        song = current_event.get('song', {}) if isinstance(current_event, dict) else {}
-        artists = current_event.get('artists') or [] if isinstance(current_event, dict) else []
+        # Find the current cut (song) from markerLists
+        now_ms = int(time.time() * 1000)
+        cut_markers = []
+        for layer in lcd.get('markerLists', []):
+            if layer.get('layer') == 'cut':
+                cut_markers = layer.get('markers', [])
+                break
 
-        artist = artists[0].get('name') if artists else 'Unknown'
-        title = song.get('name') or song.get('title') or current_event.get('name') or 'Unknown'
-        album = song.get('album') or ''
+        # Find current playing cut (latest marker that started before now)
+        current_cut = None
+        for marker in reversed(cut_markers):
+            marker_time = marker.get('time', 0)
+            if marker_time <= now_ms:
+                current_cut = marker.get('cut', {})
+                break
+
+        if not current_cut and cut_markers:
+            # Fallback to the last marker
+            current_cut = cut_markers[-1].get('cut', {})
+
+        artist = 'Unknown'
+        title = 'Unknown'
+        album = ''
+        artwork_url = ''
+
+        if current_cut:
+            # Extract artist
+            artists = current_cut.get('artists', [])
+            if artists and isinstance(artists, list) and len(artists) > 0:
+                artist = artists[0].get('name', 'Unknown')
+
+            # Extract title
+            title = current_cut.get('title', 'Unknown')
+
+            # Extract album title
+            album_data = current_cut.get('album', {})
+            if isinstance(album_data, dict):
+                album = album_data.get('title', '')
+
+                # Extract artwork from album.creativeArts
+                creative_arts = album_data.get('creativeArts', [])
+                for art in creative_arts:
+                    if art.get('size') == 'MEDIUM' and art.get('type') == 'IMAGE':
+                        artwork_url = art.get('url', '')
+                        break
+                # Fallback to any available art
+                if not artwork_url and creative_arts:
+                    artwork_url = creative_arts[0].get('url', '')
+
+        # Fall back to channel art if no track art
+        if not artwork_url:
+            artwork_url = self.get_channel_art(channel_key) or ''
 
         return {
-            'channel': lcd.get('name', ''),
+            'channel': lcd.get('channelId', channel_id),
             'artist': artist or 'Unknown',
             'title': title or 'Unknown',
-            'album': album or ''
+            'album': album or '',
+            'artwork': artwork_url or '',
         }
 
 

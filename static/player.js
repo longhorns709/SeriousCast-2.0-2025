@@ -4,6 +4,7 @@ $(function() {
     var current_channel;
     var favorites = $.cookie('favorites');
     var now_playing_last;
+    var default_art = '/static/channel-art/404.webp';
     var metadata_request = false;
     var audio = $('#player')[0];
     var hls;
@@ -85,7 +86,18 @@ $(function() {
         }
     }
 
-    function set_metadata(channel, now_playing) {
+    function update_art(url) {
+        if (url && url.length) {
+            $('.art').css('background-image', "url('" + url + "')");
+            $('link[rel="shortcut icon"]').attr('href', url);
+        } else {
+            $('.art').css('background-image', "url('" + default_art + "')");
+        }
+        // Hide buy link by default; backend does not provide it
+        $('#buylink').hide();
+    }
+
+    function set_metadata(channel, now_playing, artwork) {
         $('.currentinfo h3').text(channel);
         $('.currentinfo h4').text(now_playing);
         $('.controls').css('bottom', '0');
@@ -93,28 +105,9 @@ $(function() {
         $('title').text(now_playing);
 
         if (now_playing !== now_playing_last) {
-            change_art(now_playing);
+            update_art(artwork);
             now_playing_last = now_playing;
         }
-    }
-    function change_art(title) {
-        $.ajax({
-            url: "https://itunes.apple.com/search?term="+encodeURI(title.replace( /[^a-zA-Z]/g, " ")),
-            dataType: 'JSONP'
-        })
-        .done(function(data) {
-            if (data['resultCount'] != 0) {
-                var smallart = data['results'][0]['artworkUrl60'];
-                var bigart = smallart.replace("60x60-50","400x400-75");
-                $('.art').css('background-image',"url('"+bigart+"')");
-                $('#buylink').show();
-                $('#buylink').attr('href',data['results'][0]['trackViewUrl']);
-                $('link[rel="shortcut icon"]').attr('href',smallart);
-            } else {
-                $('.art').css('background-image',"url('http://a5.mzstatic.com/us/r30/Music/v4/04/15/78/04157815-169d-9f91-d596-342dee2f4c46/UMG_cvrart_00602537150120_01_RGB72_1200x1200_12UMGIM46901.400x400-75.jpg')");
-                $('#buylink').hide();
-            }
-        });
     }
 
     function add_favorite(channel) {
@@ -255,8 +248,12 @@ $(function() {
                 metadata_request = true;
                 $.getJSON('/metadata/' + current_channel + '/' + offset, function (data) {
                     var channel = data['channel']['name'];
-                    var now_playing = data['nowplaying']['artist'] + ' - ' + data['nowplaying']['title'];
-                    set_metadata(channel, now_playing);
+                    var np = data['nowplaying'] || {};
+                    var artist = np['artist'] || 'Unknown';
+                    var title = np['title'] || 'Unknown';
+                    var now_playing = artist + ' - ' + title;
+                    var art = np['artwork'] || '';
+                    set_metadata(channel, now_playing, art);
                     metadata_request = false;
                 });
             }

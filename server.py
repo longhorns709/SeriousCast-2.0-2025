@@ -260,6 +260,7 @@ class SeriousRequestHandler(http.server.BaseHTTPRequestHandler):
                 'artist': now.get('artist', 'Unknown'),
                 'title': now.get('title', channel['name']),
                 'album': now.get('album', ''),
+                'artwork': now.get('artwork', ''),
             },
         }, sort_keys=True, indent=4).encode('utf-8')
 
@@ -268,6 +269,26 @@ class SeriousRequestHandler(http.server.BaseHTTPRequestHandler):
         })
 
         self.wfile.write(response)
+
+
+    def channel_artwork(self, channel_number):
+        channel_number = int(channel_number)
+
+        if channel_number not in self.sbe.sxm.lineup:
+            return self.file_not_found()
+
+        channel = self.sbe.sxm.lineup[channel_number]
+        art_url = self.sbe.sxm.get_channel_art(channel['channelKey'])
+        if not art_url:
+            return self.file_not_found()
+
+        logging.info('Redirecting artwork for channel #%s to %s', channel_number, art_url)
+        self.protocol_version = 'HTTP/1.1'
+        self.send_response_only(302)
+        self.send_header('Location', art_url)
+        self.send_header('Cache-Control', 'public, max-age=3600')
+        self.send_header('Content-length', 0)
+        self.end_headers()
 
 
     def do_GET(self):
@@ -281,6 +302,7 @@ class SeriousRequestHandler(http.server.BaseHTTPRequestHandler):
             (r'^/segment/(?P<channel_number>[0-9]+)/?$', self.channel_segment),
             (r'^/channel/(?P<channel_number>[0-9]+)$', self.channel_stream),
             (r'^/channel/(?P<channel_number>[0-9]+)/(?P<rewind>[0-9]+)$', self.channel_stream),
+            (r'^/art/(?P<channel_number>[0-9]+)$', self.channel_artwork),
             (r'^/metadata/(?P<channel_number>[0-9]+)$', self.channel_metadata),
             (r'^/metadata/(?P<channel_number>[0-9]+)/(?P<rewind>[0-9]+)$', self.channel_metadata),
         )
