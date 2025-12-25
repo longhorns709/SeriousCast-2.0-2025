@@ -46,9 +46,14 @@ $(function() {
         audio.volume = 1;
     }
 
+    // Make per-channel downloads use the same M3U format as the favorites download (works in VLC)
     $('.channel-download').each(function() {
-        var link = url_base + '/hls/' + $(this).data('channel') + '.m3u8';
-        $(this).attr('href', link);
+        var ch = $(this).data('channel');
+        var name = channelNames[ch] || ('Channel ' + ch);
+        var lines = ['#EXTM3U', '#EXTINF:-1,' + name, url_base + '/hls/' + ch + '.m3u8'];
+        var content = btoa(lines.join('\n'));
+        $(this).attr('href', 'data:audio/x-mpegurl;base64,' + content);
+        $(this).attr('download', 'channel_' + ch + '.m3u8');
     });
 
     // Fallback art if missing
@@ -72,7 +77,20 @@ $(function() {
             audio.src = stream_url;
             audio.play();
         } else if (window.Hls && window.Hls.isSupported()) {
-            hls = new Hls();
+            hls = new Hls({
+                // Live stream settings - refresh playlist frequently
+                liveSyncDurationCount: 3,
+                liveMaxLatencyDurationCount: 10,
+                liveDurationInfinity: true,
+                // Disable playlist caching for live streams
+                manifestLoadingMaxRetry: 6,
+                manifestLoadingTimeOut: 10000,
+                levelLoadingMaxRetry: 6,
+                levelLoadingTimeOut: 10000,
+                // Lower latency settings
+                lowLatencyMode: true,
+                backBufferLength: 30
+            });
             hls.loadSource(stream_url);
             hls.attachMedia(audio);
             hls.on(Hls.Events.MANIFEST_PARSED, function() {
@@ -80,6 +98,23 @@ $(function() {
             });
             hls.on(Hls.Events.ERROR, function(event, data) {
                 console.error('HLS error', data);
+                // Auto-recover from non-fatal errors
+                if (data.fatal) {
+                    switch(data.type) {
+                        case Hls.ErrorTypes.NETWORK_ERROR:
+                            console.log('Network error, trying to recover...');
+                            hls.startLoad();
+                            break;
+                        case Hls.ErrorTypes.MEDIA_ERROR:
+                            console.log('Media error, trying to recover...');
+                            hls.recoverMediaError();
+                            break;
+                        default:
+                            console.log('Fatal error, cannot recover');
+                            hls.destroy();
+                            break;
+                    }
+                }
             });
         } else {
             alert('HLS not supported in this browser. Try a modern browser or open the playlist in VLC.');
@@ -148,6 +183,7 @@ $(function() {
             $('#favchannels').hide();
         }
         updateColumnVisibility();
+        refreshFavoritesNowPlaying();
         updateFavoritesPlaylistLink();
     }
 
@@ -167,7 +203,8 @@ $(function() {
 
     $('table').on("click",".player-stream",function() {
         current_channel = $(this).data('channel');
-        var stream_url = url_base + '/hls/' + current_channel + '.m3u8';
+        // Add timestamp to bust any browser caching
+        var stream_url = url_base + '/hls/' + current_channel + '.m3u8?_t=' + Date.now();
         start_stream(stream_url);
         return false;
     });
@@ -200,7 +237,7 @@ $(function() {
             $('#time').text(offset + ' min ago');
         }
         if (current_channel !== undefined) {
-            var stream_url = url_base + '/hls/' + current_channel + '.m3u8';
+            var stream_url = url_base + '/hls/' + current_channel + '.m3u8?_t=' + Date.now();
             start_stream(stream_url);
         }
     });
@@ -224,6 +261,24 @@ $(function() {
     }
 
     updateColumnVisibility();
+
+    // Only favorites get live now-playing metadata; others remain static
+    function refreshFavoritesNowPlaying() {
+        if (!favorites.length) return;
+        favorites.forEach(function(ch) {
+            $.getJSON('/metadata/' + ch + '/0', function(data) {
+                var np = data['nowplaying'] || {};
+                var artist = np['artist'] || 'Unknown';
+                var title = np['title'] || 'Unknown';
+                var channel = data['channel'] || {};
+                var genre = channel['genre'] || 'Unknown';
+                var row = $('#favchannels tr[data-channel="' + ch + '"]');
+                // Update genre and description for favorites only
+                row.find('.genre').text(genre);
+                row.find('.desc').text(artist + ' - ' + title);
+            });
+        });
+    }
 
     function updateFavoritesPlaylistLink() {
         var link = $('#fav-download');

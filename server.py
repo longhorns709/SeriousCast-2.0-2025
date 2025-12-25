@@ -183,24 +183,68 @@ class SeriousRequestHandler(http.server.BaseHTTPRequestHandler):
             channel['name']))
         logging.debug('Playlist content for channel %s:\n%s', channel_number, playlist)
 
-        lines = []
-        for line in playlist.split('\n'):
+        # Parse the playlist and keep only the last few segments for live playback
+        # Each segment is ~10 seconds, keep last 6 segments (~60 seconds buffer)
+        raw_lines = playlist.split('\n')
+        
+        # Separate header lines from segment entries
+        header_lines = []
+        segment_entries = []  # Each entry is (metadata_lines, segment_url)
+        current_metadata = []
+        
+        for line in raw_lines:
             line = line.strip()
+            if not line:
+                continue
             if line.endswith('.aac'):
-                encoded = urllib.parse.quote(line, safe='')
-                # No trailing slash before query so routing matches
-                lines.append('/segment/{}?path={}'.format(channel_number, encoded))
-            elif line.startswith('#EXT-X-KEY'):
+                # This is a segment URL - pair it with accumulated metadata
+                segment_entries.append((current_metadata, line))
+                current_metadata = []
+            elif line.startswith('#EXTM3U') or line.startswith('#EXT-X-VERSION') or \
+                 line.startswith('#EXT-X-TARGETDURATION') or line.startswith('#EXT-X-MEDIA-SEQUENCE') or \
+                 line.startswith('#EXT-X-KEY'):
+                header_lines.append(line)
+            elif line.startswith('#'):
+                # Metadata for next segment (like #EXTINF, #EXT-X-PROGRAM-DATE-TIME)
+                current_metadata.append(line)
+        
+        # Keep only the last 6 segments for near-live playback
+        live_segments = segment_entries[-6:] if len(segment_entries) > 6 else segment_entries
+        
+        # Update media sequence to match the trimmed playlist
+        # Original sequence + (total - kept) = new starting sequence
+        new_sequence = len(segment_entries) - len(live_segments)
+        
+        # Build the output playlist
+        lines = []
+        for hdr in header_lines:
+            if hdr.startswith('#EXT-X-MEDIA-SEQUENCE'):
+                # Update the media sequence number
+                try:
+                    orig_seq = int(hdr.split(':')[1])
+                    lines.append('#EXT-X-MEDIA-SEQUENCE:{}'.format(orig_seq + new_sequence))
+                except (IndexError, ValueError):
+                    lines.append(hdr)
+            elif hdr.startswith('#EXT-X-KEY'):
                 # Force absolute key URL so players request /key/1
                 lines.append('#EXT-X-KEY:METHOD=AES-128,URI="/key/1"')
             else:
-                lines.append(line)
+                lines.append(hdr)
+        
+        # Add the segment entries
+        for metadata, segment_url in live_segments:
+            for meta_line in metadata:
+                lines.append(meta_line)
+            encoded = urllib.parse.quote(segment_url, safe='')
+            lines.append('/segment/{}?path={}'.format(channel_number, encoded))
         
         response = '\n'.join(lines).encode('utf-8')
         
         self.send_standard_headers(len(response), {
             'Content-Type': 'application/vnd.apple.mpegurl',
-            'Cache-Control': 'no-cache',
+            'Cache-Control': 'no-cache, no-store, must-revalidate',
+            'Pragma': 'no-cache',
+            'Expires': '0',
         })
         self.wfile.write(response)
 

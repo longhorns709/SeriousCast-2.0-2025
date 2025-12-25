@@ -276,12 +276,53 @@ class Sirius():
                     except Exception:
                         art_url = None
 
+                    # Extract genre - try multiple fields
+                    genre = ''
+                    
+                    # First, try to get primary category name (most useful as genre)
+                    categories_data = channel.get('categories', {})
+                    if isinstance(categories_data, dict):
+                        cat_list = categories_data.get('categories', [])
+                    else:
+                        cat_list = categories_data if isinstance(categories_data, list) else []
+                    
+                    for cat in cat_list:
+                        if isinstance(cat, dict):
+                            # Prefer primary category
+                            if cat.get('isPrimary'):
+                                genre = cat.get('name', '')
+                                break
+                    
+                    # Fallback to first category if no primary
+                    if not genre and cat_list:
+                        first_cat = cat_list[0]
+                        if isinstance(first_cat, dict):
+                            genre = first_cat.get('name', '')
+                        elif isinstance(first_cat, str):
+                            genre = first_cat
+                    
+                    # Try genre.name (nested dict) as fallback
+                    if not genre:
+                        genre_data = channel.get('genre')
+                        if isinstance(genre_data, dict):
+                            genre = genre_data.get('name', '')
+                        elif isinstance(genre_data, str):
+                            genre = genre_data
+                    
+                    # Fallback to shortDescription (more concise than mediumDescription)
+                    if not genre:
+                        genre = channel.get('shortDescription', '')
+                    
+                    # Final fallback
+                    if not genre:
+                        genre = 'Music'
+
                     self.lineup[channel_num] = {
                         'siriusChannelNo': channel_num,
                         'channelKey': channel.get('channelId', ''),
                         'channelGuid': channel.get('channelGuid', ''),
                         'name': channel.get('name', ''),
-                        'genre': channel.get('genre', {}).get('name', '') if isinstance(channel.get('genre'), dict) else channel.get('genre', 'Unknown'),
+                        'genre': genre,
                         'artUrl': art_url,
                     }
             except (ValueError, TypeError):
