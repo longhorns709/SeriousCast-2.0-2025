@@ -1,0 +1,7 @@
+__pycache__
+*.py[cod]
+
+personal
+settings.cfg
+ffmpeg.exe
+seriouscast.log

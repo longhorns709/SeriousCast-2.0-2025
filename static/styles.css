@@ -1,0 +1,312 @@
+/* Theme tokens */
+:root {
+    --bg: #f7f9fc;
+    --panel: #ffffff;
+    --text: #1f252b;
+    --muted: #6b7784;
+    --accent: #0f9bd7;
+    --accent-strong: #0b7eaf;
+    --table-stripe: rgba(15,155,215,0.08);
+    --border: #e1e6ed;
+    --shadow: 0 12px 30px rgba(0,0,0,0.06);
+}
+
+[data-theme="dark"] {
+    --bg: #0d1117;
+    --panel: #161b22;
+    --text: #e6edf3;
+    --muted: #9ea7b3;
+    --accent: #58a6ff;
+    --accent-strong: #1f6feb;
+    --table-stripe: rgba(88,166,255,0.08);
+    --border: #1f2933;
+    --shadow: 0 12px 30px rgba(0,0,0,0.35);
+}
+
+/* General */
+html, body {
+    min-height: 100%;
+}
+body {
+    background: radial-gradient(circle at 10% 10%, rgba(15,155,215,0.08), transparent 40%),
+                radial-gradient(circle at 80% 0%, rgba(15,155,215,0.05), transparent 35%),
+                var(--bg);
+    color: var(--text);
+    font-family: 'Open Sans', sans-serif;
+}
+
+header {
+    height: 60px;
+    width: 100%;
+    position: fixed;
+    top: 0;
+    left: 0;
+    background-color: var(--panel);
+    color: var(--accent);
+    z-index: 99;
+    border-bottom: 1px solid var(--border);
+    box-shadow: var(--shadow);
+}
+header h1 {
+    font-weight: 700;
+    font-size: 1.6em;
+    line-height: 60px;
+    margin-left: 16px;
+    float: left;
+}
+header nav {
+    float: right;
+    display: flex;
+    align-items: center;
+    height: 60px;
+}
+header nav img {
+    height: 20px;
+    width: 20px;
+    margin-right: 18px;
+}
+header nav button {
+    margin-right: 16px;
+    height: 32px;
+    width: 32px;
+    border-radius: 8px;
+    border: 1px solid var(--border);
+    background: var(--panel);
+    color: var(--text);
+    cursor: pointer;
+    box-shadow: var(--shadow);
+}
+.main {
+    margin-top: 80px;
+    width: calc(100% - 40px);
+    padding-left: 20px;
+    padding-right: 20px;
+    padding-top: 12px;
+}
+.main h2 {
+    font-weight: 600;
+    font-size: 1.2em;
+    margin-top: 24px;
+    margin-left: 20px;
+}
+
+.section-header {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-left: 20px;
+    margin-top: 24px;
+}
+
+.pill-btn {
+    padding: 6px 12px;
+    border-radius: 999px;
+    border: 1px solid var(--border);
+    background: var(--panel);
+    color: var(--accent);
+    text-decoration: none;
+    font-weight: 600;
+    box-shadow: var(--shadow);
+}
+
+.pill-btn:hover {
+    background: var(--accent);
+    color: #fff;
+}
+
+/* Table Styling */
+.data-table {
+    margin-left: 20px;
+    width: calc(100% - 60px);
+    margin-bottom: 30px;
+    border-collapse: separate;
+    border-spacing: 0 12px;
+}
+
+.data-table thead {
+    display: none;
+}
+
+.data-table tbody {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(420px, 1fr));
+    grid-gap: 12px;
+}
+
+.data-table tr {
+    display: grid;
+    grid-template-columns: 116px 68px 74px 1.2fr 0.9fr 1.1fr;
+    align-items: center;
+    padding: 12px;
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    box-shadow: var(--shadow);
+    height: auto;
+}
+
+.data-table td {
+    padding: 4px 6px;
+    vertical-align: middle;
+    color: var(--text);
+}
+
+.data-table td img {
+    vertical-align: middle;
+}
+
+.channel {
+    font-size: 1.2em;
+    color: var(--accent);
+    font-weight: 700;
+}
+
+.button {
+    width: 82px;
+}
+
+.desc, .genre {
+    font-size: .9em;
+    color: var(--muted);
+}
+
+.art-cell {
+    width: 100%;
+    display: flex;
+    justify-content: center;
+}
+
+.channel-art {
+    width: 96px;
+    height: 96px;
+    object-fit: contain;
+    border-radius: 10px;
+    background: var(--table-stripe);
+    border: 1px solid var(--border);
+    box-shadow: var(--shadow);
+}
+
+
+/* Controls */
+.controls {
+    overflow: hidden;
+    height: 90px;
+    width: calc(100% + 24px);
+    position: fixed;
+    bottom: -90px;
+    left: 0;
+    background: linear-gradient(90deg, rgba(15,155,215,0.18), rgba(15,155,215,0.08));
+    color: var(--text);
+    transition: bottom 1s;
+    -webkit-transition: bottom 1s;
+    -transition-timing-function: ease-out;
+    -webkit-transition-timing-function: ease-out;
+}
+.playpause {
+    width: 60px;
+    height: 60px;
+    float: left;
+    margin-left: 21px;
+    text-align: center;
+    margin-top: 19px;
+    position: relative;
+}
+.playpause img {
+    margin-top: 15px;
+    height: 30px;
+    width: 30px;
+}
+.playpause img[href*=http://] {
+    -webkit-filter: brightness(75%);
+}
+.volume {
+    float: right;
+    margin-right: 30px;
+    text-align: center;
+    width: 90px;
+    padding-top: 28px;
+    position: relative;
+}
+.volume input {
+    width: 60px;
+}
+.currentinfo {
+    float: center;
+    text-align: center;
+    padding-top: 10px;
+    width: 528px;
+    margin: auto;
+}
+.currentinfo input {
+    width: 360px;
+}
+.currentinfo h3 {
+    font-size: 14px;
+    margin: auto;
+}
+.currentinfo h4 {
+    font-size: 18px;
+    margin: auto;
+    margin-top: 4px;
+    display: inline;
+}
+.currentinfo #time {
+    display: inline-block;
+    font-size: 12px;
+    cursor: pointer;
+}
+.currentinfo img {
+    margin-left: 8px;
+    margin-top: 4px;
+    margin-bottom: -2px;
+}
+#buylink {
+    display: none;
+}
+
+
+/* Info */
+.info {
+    position: fixed;
+    top: 30px;
+    right: 28px;
+    width: 250px;
+    background-color: var(--panel);
+    border: 1px solid var(--border);
+    z-index: 999;
+    font-size: .8em;
+    padding: 10px;
+    display: none;
+    box-shadow: var(--shadow);
+}
+#infobutton {
+    cursor: pointer;
+}
+
+
+/* Dumb Album art stuff */
+.art {
+    overflow: hidden;
+    position: absolute;
+    background-image: url('http://a5.mzstatic.com/us/r30/Music/v4/04/15/78/04157815-169d-9f91-d596-342dee2f4c46/UMG_cvrart_00602537150120_01_RGB72_1200x1200_12UMGIM46901.400x400-75.jpg');
+    width: 100%;
+    height: 90px;
+    background-position: 0 -600px;
+    background-size: 100%;
+    -webkit-filter: blur(12px) brightness(70%);
+    z-index: -1;
+    clip: rect(600px,calc(100% + 12px),690px,12px);
+    margin-left: -12px;
+
+}
+
+
+
+
+/* Favorite channel table */
+#favchannels, #favhead, #favsingle {
+    display: none;
+}
+#favchannels {
+    margin-top: 8px;
+}

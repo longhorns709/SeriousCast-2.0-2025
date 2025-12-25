@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html>
+ <head>
+  <meta charset="UTF-8">
+  <title>SeriousCast</title>
+    <link rel='stylesheet' href='//fonts.googleapis.com/css?family=Open+Sans:300italic,400italic,400,300,700' type='text/css'>
+    <link rel='shortcut icon' href='/favicon.ico' type='text/css'>
+  <link rel="stylesheet" href="/static/reset.css" type="text/css">
+  <link rel="stylesheet" href="/static/styles.css" type="text/css">
+ </head>
+ <body>
+    <header>
+        <h1>SeriousCast</h1>
+
+        <nav>
+            <button id="theme-toggle" aria-label="Toggle theme">🌙</button>
+        </nav>
+    </header>
+    <section class="main">
+        <div class="section-header">
+            <h2 id="favhead">Favorite Channels</h2>
+            <a id="fav-download" class="pill-btn" href="#" download="favorites.m3u8" style="display:none">Download favorites</a>
+        </div>
+        <table id="favchannels" class="data-table">
+            <thead>
+                <tr>
+                    <th>#</th>
+                    <th>Play</th>
+                    <th>Name</th>
+                    <th>Genre</th>
+                    <th>Description</th>
+                </tr>
+            </thead>
+            <tbody id="listing">
+            </tbody>
+        </table>
+        <h2>Channels</h2>
+        <table id="channels" class="data-table">
+            <thead>
+                <tr>
+                    <th></th>
+                    <th>#</th>
+                    <th>Play</th>
+                    <th>Name</th>
+                    <th>Genre</th>
+                    <th>Description</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for channel in channels %}
+                <tr data-channel="{{ channel.siriusChannelNo }}" data-id="{{ channel.contentId }}">
+                    <td class="art-cell"><img class="channel-art" loading="lazy" src="/static/channel-art/{{ channel.siriusChannelNo }}.webp" data-fallback="/static/channel-art/404.webp" alt="{{ channel.name }} art" /></td>
+                    <td class="channel">{{ channel.siriusChannelNo }}</td>
+                    <td class="button">
+                        <a class="player-stream" href="#" data-channel="{{ channel.siriusChannelNo }}" title="Stream"><img src="/static/img/plays.svg" alt="play" /></a>
+                        <a class="channel-add" href="#" data-channel="{{ channel.siriusChannelNo }}" title="Add to Favorites"><img src="/static/img/plus.svg" alt="plus" /></a>
+                        <a class="channel-download" data-channel="{{ channel.siriusChannelNo }}" download="{{ channel.playlistName }}" target="_blank" title="Download"><img src="/static/img/arrow-down.svg" alt="download" /></a>
+
+                    </td>
+                    <td class="name">{{ channel.name }}</td>
+                    <td class="genre">{{ channel.genre }}</td>
+                    <td class="desc">{{ channel.description }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </section>
+    <section class="controls">
+        <div class="art" alt="albumart">
+        </div>
+        <div class="playpause">
+        <img src="/static/img/pause.svg" alt="pausecontrol"/>
+        </div>
+        <div class="volume">
+            <img src="/static/img/volume-high.svg" alt="mutecontrol"/>
+            <br />
+            <input type="range" id="player-volume" min="1" max="100" value="100">
+        </div>
+        <div class="currentinfo">
+            <h3></h3>
+            <h4></h4><a id="buylink" href="#" target="_blank"><img src="/static/img/cart.svg" alt="buy"/></a>
+            <br />
+            <span id="time">Live</span>
+        <br /><input type="range" id="player-rewind" min="1" max="300" value="300">
+        </div>
+
+    </section>
+        <audio id="player" preload="none"></audio>
+    <script src="//ajax.googleapis.com/ajax/libs/jquery/1.10.2/jquery.min.js" type="text/javascript"></script>
+        <script src="https://cdn.jsdelivr.net/npm/hls.js@1.5.8/dist/hls.min.js"></script>
+    <script src="/static/jquery.cookie.js"></script>
+    <script src="/static/player.js"></script>
+ </body>
+</html>
