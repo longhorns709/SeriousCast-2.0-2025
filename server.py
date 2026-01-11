@@ -19,6 +19,11 @@ import jinja2
 import sirius
 import mpegutils
 
+# Register additional MIME types for PWA
+mimetypes.add_type('application/manifest+json', '.json')
+mimetypes.add_type('application/javascript', '.js')
+mimetypes.add_type('image/webp', '.webp')
+
 
 class Singleton(type):
     _instances = {}
@@ -110,8 +115,23 @@ class SeriousRequestHandler(http.server.BaseHTTPRequestHandler):
         full_path = os.path.realpath(os.path.join("./static/", path))
 
         if full_path.startswith(os.path.realpath("./static/")):
+            # Check if file exists
+            if not os.path.isfile(full_path):
+                # For channel-art, serve the 404.webp fallback
+                if 'channel-art' in path:
+                    fallback_path = os.path.realpath("./static/channel-art/404.webp")
+                    if os.path.isfile(fallback_path):
+                        with open(fallback_path, 'rb') as f:
+                            content = f.read()
+                            self.send_standard_headers(len(content), {
+                                'Content-type': 'image/webp',
+                            })
+                            self.wfile.write(content)
+                            return
+                return self.file_not_found()
+            
             # if a better mime type than octet-stream is available, use it
-            content_type = 'appllication/octet-stream'
+            content_type = 'application/octet-stream'
             extension = os.path.splitext(full_path)[1]
             if extension in mimetypes.types_map:
                 content_type = mimetypes.types_map[extension]
@@ -134,7 +154,7 @@ class SeriousRequestHandler(http.server.BaseHTTPRequestHandler):
             return self.file_not_found()
 
         channel = self.sbe.sxm.lineup[channel_number]
-        url = 'http://{}:{}/'.format(self.sbe.config('hostname'), self.sbe.config('port'))
+        channel_id = str(channel['channelKey'])
 
         logging.info('Streaming: Channel #{} "{}" with rewind {}'.format(
             channel_number,
@@ -144,16 +164,12 @@ class SeriousRequestHandler(http.server.BaseHTTPRequestHandler):
         # Use HTTP/1.0 for infinite streaming without Content-Length
         self.protocol_version = 'HTTP/1.0'
         self.send_response_only(200)
-        self.send_header('Content-Type', 'audio/aac')
+        self.send_header('Content-Type', 'audio/aacp')
         self.send_header('Cache-Control', 'no-cache, no-store')
-        self.send_header('icy-br', '256')
-        self.send_header('icy-name', channel['name'])
-        self.send_header('icy-genre', channel.get('genre', 'Unknown'))
+        self.send_header('Connection', 'close')
         self.end_headers()
 
-        channel_id = str(channel['channelKey'])
-
-        # Stream AAC segments directly
+        # Stream AAC segments directly (metadata comes from XSPF playlist)
         for aac_segment in self.sbe.sxm.packet_generator(channel_id, rewind):
             if aac_segment:
                 try:
@@ -315,6 +331,68 @@ class SeriousRequestHandler(http.server.BaseHTTPRequestHandler):
         self.wfile.write(response)
 
 
+    def channel_vlc_playlist(self, channel_number):
+        """Generate XSPF playlist for VLC with artwork and metadata"""
+        channel_number = int(channel_number)
+
+        if channel_number not in self.sbe.sxm.lineup:
+            return self.file_not_found()
+
+        channel = self.sbe.sxm.lineup[channel_number]
+        channel_id = str(channel['channelKey'])
+        
+        # Get current now playing info
+        try:
+            np = self.sbe.sxm.get_now_playing(channel_id)
+            artist = np.get('artist', '')
+            title = np.get('title', '')
+            artwork = np.get('artwork', '')
+        except:
+            artist = ''
+            title = ''
+            artwork = ''
+        
+        if not artwork:
+            artwork = 'http://{}:{}/static/channel-art/{}.webp'.format(
+                self.sbe.config('hostname'), self.sbe.config('port'), channel_number)
+        
+        base_url = 'http://{}:{}'.format(self.sbe.config('hostname'), self.sbe.config('port'))
+        # Use HLS stream which VLC handles natively
+        stream_url = '{}/hls/{}.m3u8'.format(base_url, channel_number)
+        
+        # Build XSPF playlist that VLC understands
+        track_title = '{} - {}'.format(artist, title) if artist and title else channel['name']
+        
+        xspf = '''<?xml version="1.0" encoding="UTF-8"?>
+<playlist xmlns="http://xspf.org/ns/0/" xmlns:vlc="http://www.videolan.org/vlc/playlist/ns/0/" version="1">
+    <title>{channel_name}</title>
+    <trackList>
+        <track>
+            <location>{stream_url}</location>
+            <title>{track_title}</title>
+            <creator>{artist}</creator>
+            <album>{channel_name}</album>
+            <image>{artwork}</image>
+            <info>{base_url}</info>
+        </track>
+    </trackList>
+</playlist>'''.format(
+            channel_name=channel['name'].replace('&', '&amp;').replace('<', '&lt;'),
+            stream_url=stream_url,
+            track_title=track_title.replace('&', '&amp;').replace('<', '&lt;'),
+            artist=artist.replace('&', '&amp;').replace('<', '&lt;') if artist else channel['name'],
+            artwork=artwork,
+            base_url=base_url
+        )
+        
+        response = xspf.encode('utf-8')
+        self.send_standard_headers(len(response), {
+            'Content-Type': 'application/xspf+xml',
+            'Content-Disposition': 'inline; filename="{}.xspf"'.format(channel['name']),
+        })
+        self.wfile.write(response)
+
+
     def channel_artwork(self, channel_number):
         channel_number = int(channel_number)
 
@@ -346,6 +424,8 @@ class SeriousRequestHandler(http.server.BaseHTTPRequestHandler):
             (r'^/segment/(?P<channel_number>[0-9]+)/?$', self.channel_segment),
             (r'^/channel/(?P<channel_number>[0-9]+)$', self.channel_stream),
             (r'^/channel/(?P<channel_number>[0-9]+)/(?P<rewind>[0-9]+)$', self.channel_stream),
+            (r'^/vlc/(?P<channel_number>[0-9]+)\.xspf$', self.channel_vlc_playlist),
+            (r'^/vlc/(?P<channel_number>[0-9]+)$', self.channel_vlc_playlist),
             (r'^/art/(?P<channel_number>[0-9]+)$', self.channel_artwork),
             (r'^/metadata/(?P<channel_number>[0-9]+)$', self.channel_metadata),
             (r'^/metadata/(?P<channel_number>[0-9]+)/(?P<rewind>[0-9]+)$', self.channel_metadata),

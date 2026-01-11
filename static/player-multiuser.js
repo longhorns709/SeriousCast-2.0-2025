@@ -2,7 +2,9 @@ $(function() {
     var url_base = window.location.origin;
     var offset = 0;
     var current_channel;
-    var favorites = $.cookie('favorites');
+    var currentUser = null;
+    var users = [];
+    var favorites = [];
     var now_playing_last;
     var default_art = '/static/channel-art/404.webp';
     var metadata_request = false;
@@ -10,7 +12,228 @@ $(function() {
     var hls;
     var channelNames = {};
 
-    // build channel name map
+    // User avatar colors
+    var avatarColors = [
+        ['#0f9bd7', '#0b7eaf'],  // Blue
+        ['#e74c3c', '#c0392b'],  // Red
+        ['#2ecc71', '#27ae60'],  // Green
+        ['#9b59b6', '#8e44ad'],  // Purple
+        ['#f39c12', '#d68910'],  // Orange
+        ['#1abc9c', '#16a085'],  // Teal
+        ['#e91e63', '#c2185b'],  // Pink
+        ['#00bcd4', '#0097a7']   // Cyan
+    ];
+
+    // Load users from localStorage
+    function loadUsers() {
+        try {
+            var stored = localStorage.getItem('seriouscast_users');
+            if (stored) {
+                users = JSON.parse(stored);
+            }
+        } catch(e) {
+            users = [];
+        }
+        if (!users || users.length === 0) {
+            users = [];
+        }
+    }
+
+    function saveUsers() {
+        localStorage.setItem('seriouscast_users', JSON.stringify(users));
+    }
+
+    function getCurrentUser() {
+        var userId = localStorage.getItem('seriouscast_current_user');
+        if (userId) {
+            return users.find(u => u.id === userId) || null;
+        }
+        return null;
+    }
+
+    function setCurrentUser(user) {
+        currentUser = user;
+        localStorage.setItem('seriouscast_current_user', user ? user.id : '');
+        if (user) {
+            favorites = user.favorites || [];
+        } else {
+            favorites = [];
+        }
+    }
+
+    function getUserFavorites(user) {
+        return user ? (user.favorites || []) : [];
+    }
+
+    function saveUserFavorites() {
+        if (currentUser) {
+            currentUser.favorites = favorites;
+            // Update user in array
+            var idx = users.findIndex(u => u.id === currentUser.id);
+            if (idx >= 0) {
+                users[idx] = currentUser;
+            }
+            saveUsers();
+        }
+    }
+
+    function generateUserId() {
+        return 'user_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
+    }
+
+    function getInitials(name) {
+        return name.split(' ').map(w => w[0]).join('').toUpperCase().substr(0, 2);
+    }
+
+    function getAvatarColor(index) {
+        return avatarColors[index % avatarColors.length];
+    }
+
+    // Show user selection modal
+    function showUserModal(editMode) {
+        editMode = editMode || false;
+        
+        var html = '<div class="user-modal-overlay" id="user-modal">';
+        html += '<div class="user-modal">';
+        html += '<h2>Who\'s Listening?</h2>';
+        html += '<p>Select your profile to load your favorites</p>';
+        html += '<div class="user-grid' + (editMode ? ' edit-mode' : '') + '">';
+        
+        users.forEach(function(user, index) {
+            var colors = getAvatarColor(index);
+            var initials = getInitials(user.name);
+            html += '<div class="user-btn" data-user-id="' + user.id + '">';
+            html += '<button class="delete-user" data-user-id="' + user.id + '">&times;</button>';
+            html += '<div class="user-avatar" style="background: linear-gradient(135deg, ' + colors[0] + ', ' + colors[1] + ')">' + initials + '</div>';
+            html += '<span>' + escapeHtml(user.name) + '</span>';
+            html += '</div>';
+        });
+        
+        html += '<div class="user-btn add-user">';
+        html += '<div class="user-avatar">+</div>';
+        html += '<span>Add User</span>';
+        html += '</div>';
+        html += '</div>';
+        
+        html += '<div class="add-user-form" id="add-user-form">';
+        html += '<input type="text" id="new-user-name" placeholder="Enter name..." maxlength="20" autocomplete="off">';
+        html += '<button id="create-user-btn">Create Profile</button>';
+        html += '</div>';
+        
+        if (users.length > 0) {
+            html += '<button class="edit-users-btn" id="edit-users-btn">' + (editMode ? 'Done' : 'Edit Profiles') + '</button>';
+        }
+        
+        html += '</div></div>';
+        
+        $('body').append(html);
+        
+        // Bind events
+        $('#user-modal .user-btn:not(.add-user)').on('click', function(e) {
+            if ($(e.target).hasClass('delete-user')) return;
+            if ($('.user-grid').hasClass('edit-mode')) return;
+            
+            var userId = $(this).data('user-id');
+            var user = users.find(u => u.id === userId);
+            if (user) {
+                setCurrentUser(user);
+                $('#user-modal').remove();
+                onUserSelected();
+            }
+        });
+        
+        $('#user-modal .add-user').on('click', function() {
+            $('#add-user-form').addClass('visible');
+            $('#new-user-name').focus();
+        });
+        
+        $('#create-user-btn').on('click', function() {
+            createNewUser();
+        });
+        
+        $('#new-user-name').on('keypress', function(e) {
+            if (e.which === 13) {
+                createNewUser();
+            }
+        });
+        
+        $('#edit-users-btn').on('click', function() {
+            $('#user-modal').remove();
+            showUserModal(!editMode);
+        });
+        
+        $('.delete-user').on('click', function(e) {
+            e.stopPropagation();
+            var userId = $(this).data('user-id');
+            if (confirm('Delete this profile?')) {
+                users = users.filter(u => u.id !== userId);
+                saveUsers();
+                $('#user-modal').remove();
+                if (users.length === 0) {
+                    showUserModal(false);
+                } else {
+                    showUserModal(true);
+                }
+            }
+        });
+    }
+
+    function createNewUser() {
+        var name = $('#new-user-name').val().trim();
+        if (!name) {
+            $('#new-user-name').focus();
+            return;
+        }
+        
+        var user = {
+            id: generateUserId(),
+            name: name,
+            favorites: [],
+            createdAt: Date.now()
+        };
+        
+        users.push(user);
+        saveUsers();
+        setCurrentUser(user);
+        $('#user-modal').remove();
+        onUserSelected();
+    }
+
+    function escapeHtml(text) {
+        var div = document.createElement('div');
+        div.textContent = text;
+        return div.innerHTML;
+    }
+
+    function updateUserBadge() {
+        $('.current-user-badge').remove();
+        
+        if (currentUser) {
+            var idx = users.findIndex(u => u.id === currentUser.id);
+            var colors = getAvatarColor(idx >= 0 ? idx : 0);
+            var initials = getInitials(currentUser.name);
+            
+            var badge = '<div class="current-user-badge" id="switch-user">';
+            badge += '<div class="mini-avatar" style="background: linear-gradient(135deg, ' + colors[0] + ', ' + colors[1] + ')">' + initials + '</div>';
+            badge += '<span>' + escapeHtml(currentUser.name) + '</span>';
+            badge += '</div>';
+            
+            $('header nav').prepend(badge);
+            
+            $('#switch-user').on('click', function() {
+                showUserModal();
+            });
+        }
+    }
+
+    function onUserSelected() {
+        updateUserBadge();
+        rebuild_favorites();
+        refreshFavoritesNowPlaying();
+        updateFavoritesPlaylistLink();
+    }
+
+    // Build channel name map
     $('table#channels tbody tr').each(function() {
         var ch = $(this).data('channel');
         var name = $('.name', this).text().trim();
@@ -23,12 +246,12 @@ $(function() {
         $('#theme-toggle').text(theme === 'dark' ? '☀️' : '🌙');
     }
 
-    var savedTheme = $.cookie('theme') || 'light';
+    var savedTheme = localStorage.getItem('seriouscast_theme') || 'light';
     applyTheme(savedTheme);
 
     $('#theme-toggle').on('click', function() {
         var next = (document.documentElement.getAttribute('data-theme') === 'dark') ? 'light' : 'dark';
-        $.cookie('theme', next, { expires: 9999 });
+        localStorage.setItem('seriouscast_theme', next);
         applyTheme(next);
     });
 
@@ -43,7 +266,6 @@ $(function() {
         jiggleMode = true;
         $('#favchannels').addClass('jiggle-mode');
         $('#favchannels tr').addClass('jiggle');
-        // Add done button
         if ($('#jiggle-done').length === 0) {
             $('.section-header').append('<button id="jiggle-done" class="pill-btn">Done</button>');
         }
@@ -73,7 +295,6 @@ $(function() {
         }
     });
 
-    // Done button click
     $(document).on('click', '#jiggle-done', function() {
         stopJiggleMode();
     });
@@ -94,14 +315,12 @@ $(function() {
         var clientY = e.type === 'touchmove' ? e.originalEvent.touches[0].clientY : e.clientY;
         var clientX = e.type === 'touchmove' ? e.originalEvent.touches[0].clientX : e.clientX;
         
-        // Find which row we're hovering over
         $('#favchannels tr').not('.dragging').each(function() {
             var rect = this.getBoundingClientRect();
             if (clientX >= rect.left && clientX <= rect.right &&
                 clientY >= rect.top && clientY <= rect.bottom) {
                 var hoverIndex = $(this).index();
                 if (hoverIndex !== draggedIndex) {
-                    // Move the dragged item
                     if (hoverIndex < draggedIndex) {
                         $(this).before(draggedItem);
                     } else {
@@ -118,46 +337,59 @@ $(function() {
         draggedItem.removeClass('dragging');
         draggedItem = null;
         
-        // Save the new order
         if (jiggleMode) {
             var newOrder = [];
             $('#favchannels tr').each(function() {
                 newOrder.push(String($(this).data('channel')));
             });
             favorites = newOrder;
-            $.cookie('favorites', escape(favorites.join(',')), { expires: 9999 });
-            // Refresh now playing for reordered favorites
+            saveUserFavorites();
             refreshFavoritesNowPlaying();
             updateFavoritesPlaylistLink();
         }
     });
 
-    if (favorites !== undefined) {
-        favorites = unescape(favorites).split(',');
+    // Initialize
+    loadUsers();
+    currentUser = getCurrentUser();
+    
+    if (!currentUser) {
+        // Show user selection modal on first load
+        showUserModal();
     } else {
-        favorites = Array();
+        favorites = currentUser.favorites || [];
+        onUserSelected();
     }
-    rebuild_favorites();
 
-    if ($.cookie('volume') !== undefined) {
-        audio.volume = parseInt($.cookie('volume'), 10) / 100;
-        $('#player-volume').val(parseInt($.cookie('volume'), 10));
+    // Volume from localStorage
+    var savedVolume = localStorage.getItem('seriouscast_volume');
+    if (savedVolume !== null) {
+        audio.volume = parseInt(savedVolume, 10) / 100;
+        $('#player-volume').val(parseInt(savedVolume, 10));
     } else {
         audio.volume = 1;
     }
 
-    // Make per-channel downloads use XSPF format (works in VLC/Winamp with artwork)
+    // Make per-channel downloads use XSPF format
     $('.channel-download').each(function() {
         var ch = $(this).data('channel');
-        // Link directly to server-generated XSPF with live metadata
         $(this).attr('href', url_base + '/vlc/' + ch + '.xspf');
         $(this).attr('download', 'channel_' + ch + '.xspf');
     });
 
-    // Fallback art if missing
+    // Fallback art chain: local file -> SiriusXM art URL -> 404.webp
     $('img.channel-art').on('error', function() {
-        var fallback = $(this).data('fallback') || '/static/channel-art/404.webp';
-        if (this.src !== fallback) {
+        var $img = $(this);
+        var sxmArt = $img.data('sxm-art');
+        var fallback = $img.data('fallback') || '/static/channel-art/404.webp';
+        var currentSrc = this.src;
+        
+        // If we haven't tried SiriusXM art yet and it exists, try it
+        if (sxmArt && !$img.data('tried-sxm')) {
+            $img.data('tried-sxm', true);
+            this.src = sxmArt;
+        } else if (currentSrc !== fallback) {
+            // Final fallback to 404.webp
             this.src = fallback;
         }
     });
@@ -176,16 +408,13 @@ $(function() {
             audio.play();
         } else if (window.Hls && window.Hls.isSupported()) {
             hls = new Hls({
-                // Live stream settings - refresh playlist frequently
                 liveSyncDurationCount: 3,
                 liveMaxLatencyDurationCount: 10,
                 liveDurationInfinity: true,
-                // Disable playlist caching for live streams
                 manifestLoadingMaxRetry: 6,
                 manifestLoadingTimeOut: 10000,
                 levelLoadingMaxRetry: 6,
                 levelLoadingTimeOut: 10000,
-                // Lower latency settings
                 lowLatencyMode: true,
                 backBufferLength: 30
             });
@@ -196,7 +425,6 @@ $(function() {
             });
             hls.on(Hls.Events.ERROR, function(event, data) {
                 console.error('HLS error', data);
-                // Auto-recover from non-fatal errors
                 if (data.fatal) {
                     switch(data.type) {
                         case Hls.ErrorTypes.NETWORK_ERROR:
@@ -221,13 +449,9 @@ $(function() {
 
     function update_art(url) {
         var artUrl = (url && url.length) ? url : default_art;
-        // Update blurred background
         $('.art').css('background-image', "url('" + artUrl + "')");
-        // Update visible album thumbnail
         $('#album-art-img').attr('src', artUrl);
-        // Update favicon
         $('link[rel="shortcut icon"]').attr('href', artUrl);
-        // Hide buy link by default; backend does not provide it
         $('#buylink').hide();
     }
 
@@ -253,22 +477,21 @@ $(function() {
 
     function remove_favorite(channel) {
         if (favorites.indexOf(String(channel)) !== -1) {
-            favorites.splice(favorites.indexOf(String(channel)),1);
+            favorites.splice(favorites.indexOf(String(channel)), 1);
             put_favorites();
         }
     }
 
     function put_favorites() {
-        $.cookie('favorites', escape(favorites.join(',')), { expires: 9999 });
+        saveUserFavorites();
         rebuild_favorites();
     }
 
     function rebuild_favorites() {
         if (favorites.indexOf('') !== -1) {
-            favorites.splice(favorites.indexOf(''),1);
+            favorites.splice(favorites.indexOf(''), 1);
         }
         
-        // Show all channels first, then hide ones that are favorites
         $('#channels tbody tr').show();
         favorites.forEach(function(ch) {
             $('#channels tbody tr[data-channel="' + ch + '"]').hide();
@@ -280,7 +503,7 @@ $(function() {
             $('#favchannels tr').remove();
             $.each(favorites, function(data, key) {
                 var element = $('#channels tr[data-channel='+key+']').clone();
-                element.show(); // Make sure cloned element is visible
+                element.show();
                 $('#listing').append(element);
             });
             $('#favchannels .channel-add').attr('class','channel-remove');
@@ -310,7 +533,6 @@ $(function() {
 
     $('table').on("click",".player-stream",function() {
         current_channel = $(this).data('channel');
-        // Add timestamp to bust any browser caching
         var stream_url = url_base + '/hls/' + current_channel + '.m3u8?_t=' + Date.now();
         start_stream(stream_url);
         return false;
@@ -332,7 +554,7 @@ $(function() {
     $('#player-volume').change(function() {
         var volume = parseInt($('#player-volume').val(), 10);
         audio.volume = volume / 100;
-        $.cookie('volume', volume,{ expires: 9999 });
+        localStorage.setItem('seriouscast_volume', volume);
     });
     
     $('#player-rewind').change(function() {
@@ -369,7 +591,6 @@ $(function() {
 
     updateColumnVisibility();
 
-    // Only favorites get live now-playing metadata; others remain static
     function refreshFavoritesNowPlaying() {
         if (!favorites.length) return;
         favorites.forEach(function(ch) {
@@ -381,10 +602,9 @@ $(function() {
                 var channel = data['channel'] || {};
                 var genre = channel['genre'] || '';
                 var row = $('#favchannels tr[data-channel="' + ch + '"]');
-                // Update genre for favorites
+                
                 if (genre) row.find('.genre').text(genre);
                 
-                // Add or update now-playing info under the channel name
                 var nameCell = row.find('.name');
                 var nowPlayingText = '';
                 if (artist && title) {
@@ -395,7 +615,6 @@ $(function() {
                     nowPlayingText = title;
                 }
                 
-                // Check if now-playing span exists, if not create it
                 var npSpan = nameCell.find('.fav-now-playing');
                 if (npSpan.length === 0) {
                     nameCell.append('<span class="fav-now-playing"></span>');
@@ -403,10 +622,8 @@ $(function() {
                 }
                 npSpan.text(nowPlayingText);
                 
-                // Update the mini artwork on the favorite card
                 if (artwork) {
                     var artImg = row.find('.channel-art');
-                    // Store original channel art as fallback
                     if (!artImg.data('original-src')) {
                         artImg.data('original-src', artImg.attr('src'));
                     }
@@ -457,4 +674,13 @@ $(function() {
     setInterval(function() {
         refreshFavoritesNowPlaying();
     }, 15000);
+
+    // Register service worker for PWA
+    if ('serviceWorker' in navigator) {
+        navigator.serviceWorker.register('/static/sw.js').then(function(reg) {
+            console.log('Service worker registered');
+        }).catch(function(err) {
+            console.log('Service worker registration failed:', err);
+        });
+    }
 });

@@ -326,6 +326,42 @@ header nav button {
     margin-top: 8px;
 }
 
+/* Jiggle mode animation (iOS-style) */
+@keyframes jiggle {
+    0% { transform: rotate(-0.5deg); }
+    25% { transform: rotate(0.5deg); }
+    50% { transform: rotate(-0.5deg); }
+    75% { transform: rotate(0.5deg); }
+    100% { transform: rotate(-0.5deg); }
+}
+
+#favchannels tr.jiggle {
+    animation: jiggle 0.4s ease-in-out infinite;
+    cursor: grab;
+}
+
+#favchannels tr.jiggle:nth-child(even) {
+    animation-delay: 0.2s;
+}
+
+#favchannels tr.dragging {
+    opacity: 0.8;
+    transform: scale(1.02);
+    box-shadow: 0 8px 25px rgba(0,0,0,0.3);
+    z-index: 100;
+    cursor: grabbing;
+    animation: none;
+}
+
+#favchannels.jiggle-mode tr {
+    user-select: none;
+    -webkit-user-select: none;
+}
+
+#jiggle-done {
+    margin-left: 12px;
+}
+
 /* Now playing text under favorite channel names */
 .fav-now-playing {
     display: block;

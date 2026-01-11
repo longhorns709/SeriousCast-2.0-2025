@@ -1,0 +1,506 @@
+/* Mobile-specific styles for SeriousCast */
+
+/* User Selection Modal */
+.user-modal-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.85);
+    z-index: 1000;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+}
+
+.user-modal {
+    background: var(--panel);
+    border-radius: 20px;
+    padding: 30px;
+    max-width: 90%;
+    width: 360px;
+    text-align: center;
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.4);
+    border: 1px solid var(--border);
+}
+
+.user-modal h2 {
+    font-size: 1.5em;
+    margin-bottom: 8px;
+    color: var(--text);
+}
+
+.user-modal p {
+    color: var(--muted);
+    margin-bottom: 24px;
+    font-size: 0.9em;
+}
+
+.user-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 16px;
+    margin-bottom: 20px;
+}
+
+.user-btn {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 20px 16px;
+    background: var(--bg);
+    border: 2px solid var(--border);
+    border-radius: 16px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.user-btn:hover, .user-btn:active {
+    border-color: var(--accent);
+    background: var(--table-stripe);
+    transform: scale(1.02);
+}
+
+.user-avatar {
+    width: 60px;
+    height: 60px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, var(--accent), var(--accent-strong));
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 28px;
+    color: white;
+    margin-bottom: 10px;
+    font-weight: 700;
+}
+
+.user-btn span {
+    font-size: 1em;
+    font-weight: 600;
+    color: var(--text);
+}
+
+.user-btn.add-user {
+    border-style: dashed;
+    opacity: 0.7;
+}
+
+.user-btn.add-user:hover {
+    opacity: 1;
+}
+
+.user-btn.add-user .user-avatar {
+    background: var(--muted);
+    font-size: 32px;
+}
+
+/* Delete user button (X) */
+.user-btn .delete-user {
+    position: absolute;
+    top: -8px;
+    right: -8px;
+    width: 24px;
+    height: 24px;
+    border-radius: 50%;
+    background: #e74c3c;
+    color: white;
+    border: none;
+    font-size: 14px;
+    font-weight: 700;
+    cursor: pointer;
+    display: none;
+    align-items: center;
+    justify-content: center;
+    line-height: 1;
+}
+
+.user-btn {
+    position: relative;
+}
+
+.user-grid.edit-mode .user-btn:not(.add-user) .delete-user {
+    display: flex;
+}
+
+.user-grid.edit-mode .user-btn:not(.add-user) {
+    animation: jiggle 0.4s ease-in-out infinite;
+}
+
+/* Add user form */
+.add-user-form {
+    display: none;
+    margin-top: 20px;
+}
+
+.add-user-form.visible {
+    display: block;
+}
+
+.add-user-form input {
+    width: 100%;
+    padding: 14px 16px;
+    border: 2px solid var(--border);
+    border-radius: 12px;
+    background: var(--bg);
+    color: var(--text);
+    font-size: 1em;
+    margin-bottom: 12px;
+    box-sizing: border-box;
+}
+
+.add-user-form input:focus {
+    outline: none;
+    border-color: var(--accent);
+}
+
+.add-user-form button {
+    width: 100%;
+    padding: 14px;
+    border: none;
+    border-radius: 12px;
+    background: var(--accent);
+    color: white;
+    font-size: 1em;
+    font-weight: 600;
+    cursor: pointer;
+}
+
+.add-user-form button:hover {
+    background: var(--accent-strong);
+}
+
+/* Current user header badge */
+.current-user-badge {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 12px;
+    background: var(--table-stripe);
+    border-radius: 20px;
+    margin-right: 8px;
+    cursor: pointer;
+    border: 1px solid var(--border);
+}
+
+.current-user-badge .mini-avatar {
+    width: 24px;
+    height: 24px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, var(--accent), var(--accent-strong));
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 12px;
+    color: white;
+    font-weight: 700;
+}
+
+.current-user-badge span {
+    font-size: 0.85em;
+    font-weight: 600;
+    color: var(--text);
+}
+
+/* Mobile responsive adjustments */
+@media screen and (max-width: 768px) {
+    /* Header */
+    header {
+        height: 56px;
+    }
+    
+    header h1 {
+        font-size: 1.3em;
+        line-height: 56px;
+        margin-left: 12px;
+    }
+    
+    header nav {
+        height: 56px;
+    }
+    
+    header nav button {
+        width: 36px;
+        height: 36px;
+    }
+    
+    /* Main content */
+    .main {
+        margin-top: 68px;
+        padding-left: 10px;
+        padding-right: 10px;
+        width: calc(100% - 20px);
+    }
+    
+    .main h2 {
+        font-size: 1.1em;
+        margin-left: 10px;
+    }
+    
+    .section-header {
+        margin-left: 10px;
+        flex-wrap: wrap;
+        gap: 8px;
+    }
+    
+    /* Table - card layout for mobile */
+    .data-table {
+        margin-left: 10px;
+        width: calc(100% - 20px);
+    }
+    
+    .data-table tbody {
+        grid-template-columns: 1fr;
+    }
+    
+    .data-table tr {
+        grid-template-columns: 80px 1fr;
+        grid-template-rows: auto auto auto;
+        padding: 12px;
+        gap: 8px;
+    }
+    
+    .data-table .art-cell {
+        grid-row: span 3;
+    }
+    
+    .channel-art {
+        width: 70px;
+        height: 70px;
+    }
+    
+    .data-table .channel {
+        font-size: 1em;
+        grid-column: 2;
+    }
+    
+    .data-table .name {
+        grid-column: 2;
+        font-size: 0.95em;
+        font-weight: 600;
+    }
+    
+    .data-table .button {
+        grid-column: 2;
+        width: auto;
+        display: flex;
+        gap: 16px;
+    }
+    
+    .data-table .button a img {
+        width: 28px;
+        height: 28px;
+    }
+    
+    .data-table .genre,
+    .data-table .desc {
+        display: none;
+    }
+    
+    /* Controls bar */
+    .controls {
+        height: 80px;
+        bottom: -80px;
+    }
+    
+    .controls.visible {
+        bottom: 0;
+    }
+    
+    .album-thumb {
+        width: 60px;
+        height: 60px;
+        margin: 10px;
+    }
+    
+    .album-thumb img {
+        width: 60px;
+        height: 60px;
+    }
+    
+    .playpause {
+        width: 50px;
+        height: 50px;
+        margin-left: 10px;
+        margin-top: 15px;
+    }
+    
+    .playpause img {
+        width: 26px;
+        height: 26px;
+        margin-top: 12px;
+    }
+    
+    .currentinfo {
+        width: auto;
+        padding-top: 8px;
+        padding-left: 10px;
+        padding-right: 90px;
+        text-align: left;
+    }
+    
+    .currentinfo h3 {
+        font-size: 11px;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        max-width: 100%;
+    }
+    
+    .currentinfo h4 {
+        font-size: 14px;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        max-width: 100%;
+        display: block;
+    }
+    
+    .currentinfo input[type="range"] {
+        display: none;
+    }
+    
+    .currentinfo #time {
+        font-size: 10px;
+    }
+    
+    .volume {
+        position: absolute;
+        right: 10px;
+        top: 50%;
+        transform: translateY(-50%);
+        width: 40px;
+        padding-top: 0;
+        margin-right: 10px;
+    }
+    
+    .volume input {
+        display: none;
+    }
+    
+    .volume img {
+        width: 24px;
+        height: 24px;
+    }
+    
+    /* User modal mobile */
+    .user-modal {
+        width: calc(100% - 40px);
+        max-width: none;
+        padding: 24px;
+        border-radius: 16px;
+    }
+    
+    .user-grid {
+        grid-template-columns: repeat(2, 1fr);
+        gap: 12px;
+    }
+    
+    .user-btn {
+        padding: 16px 12px;
+    }
+    
+    .user-avatar {
+        width: 50px;
+        height: 50px;
+        font-size: 24px;
+    }
+    
+    .pill-btn {
+        padding: 8px 14px;
+        font-size: 0.85em;
+    }
+    
+    /* Now playing text */
+    .fav-now-playing {
+        max-width: 100%;
+        font-size: 0.75em;
+    }
+}
+
+/* iOS safe areas */
+@supports (padding-top: env(safe-area-inset-top)) {
+    header {
+        padding-top: env(safe-area-inset-top);
+        height: calc(56px + env(safe-area-inset-top));
+    }
+    
+    .controls {
+        padding-bottom: env(safe-area-inset-bottom);
+        height: calc(80px + env(safe-area-inset-bottom));
+    }
+    
+    .main {
+        margin-top: calc(68px + env(safe-area-inset-top));
+    }
+}
+
+/* Hide scrollbar but allow scroll */
+body::-webkit-scrollbar {
+    display: none;
+}
+
+body {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+}
+
+/* Smooth scrolling */
+html {
+    scroll-behavior: smooth;
+}
+
+/* Touch-friendly tap targets */
+@media (pointer: coarse) {
+    .player-stream,
+    .channel-add,
+    .channel-remove,
+    .channel-download {
+        min-width: 44px;
+        min-height: 44px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
+}
+
+/* Pull to refresh indicator (visual only) */
+.pull-indicator {
+    position: fixed;
+    top: 60px;
+    left: 50%;
+    transform: translateX(-50%) translateY(-60px);
+    background: var(--accent);
+    color: white;
+    padding: 8px 16px;
+    border-radius: 20px;
+    font-size: 0.85em;
+    opacity: 0;
+    transition: transform 0.3s, opacity 0.3s;
+    z-index: 50;
+}
+
+.pull-indicator.visible {
+    transform: translateX(-50%) translateY(0);
+    opacity: 1;
+}
+
+/* Edit users button */
+.edit-users-btn {
+    margin-top: 16px;
+    padding: 10px 20px;
+    background: transparent;
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    color: var(--muted);
+    font-size: 0.85em;
+    cursor: pointer;
+}
+
+.edit-users-btn:hover {
+    border-color: var(--accent);
+    color: var(--accent);
+}
